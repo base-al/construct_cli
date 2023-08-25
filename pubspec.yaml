@@ -1,7 +1,7 @@
 name: construct_cli
-description: Constru command-line application.
-version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+description: Construct command-line application.
+version: 0.0.3
+repository:  https://github.com/base-al/construct_cli.git
 
 environment:
   sdk: ^3.0.6
@@ -9,8 +9,9 @@ environment:
 # Add regular dependencies here.
 dependencies:
   args: ^2.4.2
-   # path: ^1.8.0
-
+  # path: ^1.8.0
+executables:
+  construct: construct_cli # The name of the executable to generate.
 dev_dependencies:
   lints: ^2.0.0
   test: ^1.21.0
