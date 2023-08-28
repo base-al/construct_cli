@@ -1,52 +1,71 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/args.dart';
+import 'package:path/path.dart' as path;
 
-void main(List<String> arguments) {
+void main(List<String> arguments) async {
   final parser = ArgParser();
   parser.addCommand('create');
 
   final args = parser.parse(arguments);
 
   if (args.command != null && args.command!.name == 'create') {
-    final projectName = args.command!.rest.first;
-    if (projectName.isNotEmpty) {
-      createProject(projectName);
-    } else {
-      print('Usage: construct create <projectName>');
-    }
+    final projectName =
+        args.command!.rest.isNotEmpty ? args.command!.rest.first : '';
+    projectName.isNotEmpty ? await createProject(projectName) : printUsage();
   } else {
-    print('Usage: construct create <projectName>');
+    printUsage();
   }
 }
 
-void createProject(String projectName) {
-  final projectDirectory = Directory(projectName);
-  final templateDirectory = Directory('template'); // Adjust the path here
+void printUsage() {
+  print('Usage: construct create <projectName>');
+}
 
-  if (projectDirectory.existsSync()) {
-    print('Error: Directory "$projectName" already exists');
+Future<void> createProject(String projectName) async {
+  final currentDirectory = Directory.current;
+  final projectDirectoryPath = path.join(currentDirectory.path, projectName);
+  final projectDirectory = Directory(projectDirectoryPath);
+
+  final templatePackageUri = Uri.parse('package:construct_cli/template');
+  final resolvedUri = await Isolate.resolvePackageUri(templatePackageUri);
+
+  if (resolvedUri == null) {
+    print('Error: Could not resolve package URI');
     return;
   }
 
-  // Create the project directory
-  projectDirectory.createSync();
+  final templateDirectoryPath =
+      path.join(currentDirectory.path, 'lib', 'template');
 
-  // Copy entire contents of the template directory to the project directory
-  copyDirectory(templateDirectory, projectDirectory);
+  if (await projectDirectory.exists()) {
+    stdout.write(
+        'Error: Directory "$projectName" already exists, do you want to override (y/n): ');
+    final input = stdin.readLineSync();
+
+    if (input?.toLowerCase() != 'y') {
+      print('Aborted.');
+      return;
+    }
+
+    await projectDirectory.delete(recursive: true);
+  }
+
+  await projectDirectory.create();
+  await copyDirectory(Directory(templateDirectoryPath), projectDirectory);
 
   print('Project "$projectName" created successfully');
 }
 
-void copyDirectory(Directory source, Directory destination) {
-  for (var entity in source.listSync(recursive: true)) {
-    final relativePath = entity.uri.path.replaceFirst(source.uri.path, '');
-    final destinationPath = '${destination.path}/$relativePath';
-
+Future<void> copyDirectory(Directory source, Directory destination) async {
+  final entities = await source.list(recursive: true).toList();
+  for (var entity in entities) {
+    final relative = path.relative(entity.path, from: source.path);
     if (entity is File) {
-      entity.copySync(destinationPath);
+      await entity.copy(path.join(destination.path, relative));
     } else if (entity is Directory) {
-      Directory(destinationPath).createSync();
+      await Directory(path.join(destination.path, relative)).create();
     }
   }
 }
